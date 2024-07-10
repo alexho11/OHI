@@ -1,0 +1,67 @@
+{% extends "ohi/layout.html" %}
+{% block title %}
+    Login
+{% endblock %}
+{% block content %}
+<style>
+    html,
+body {
+  height: 100%;
+}
+
+.form-signin {
+  max-width: 330px;
+  padding: 1rem;
+}
+
+.form-signin .form-floating:focus-within {
+  z-index: 2;
+}
+
+.form-signin input[type="email"] {
+  margin-bottom: -1px;
+  border-bottom-right-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.form-signin input[type="password"] {
+  margin-bottom: 10px;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+.container {
+  display: flex;
+  padding: 10px;
+}
+
+</style>
+    {% if message %}
+    <div class="container">
+        <h3>{{ message }}</h3>
+    </div>
+    {% endif %}
+    {% if user.is_authenticated %}
+    <div class="container">
+        <h3>You are already logged in as {{ user.username }}</h3>
+    </div>
+    {% else %}
+    <div class="container-sm">
+      <main class="form-signin">
+          <h1 class="h3 mb-3 fw-normal">Please sign in</h1>
+          <form action="{% url 'ohi:login' %}" method="post" >
+              {% csrf_token %}
+              <div class="form-floating">
+                  <input type="username" id="floatingInput" class="form-control input-width" name="username" placeholder="Username">
+                  <label for="floatingInput">Username</label>
+              </div>
+              <div class="form-floating">
+                  <input type="password" id="floatingPassword" class="form-control input-width" name="password" placeholder="Password">
+                  <label for="floatingPassword">Password</label>
+              </div>
+              <button type="submit" class="btn btn-primary w-100 py-2">Login</button>
+          </form>
+      </main>
+      </div>
+    {% endif %}
+{% endblock %}

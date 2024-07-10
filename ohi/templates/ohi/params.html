@@ -1,0 +1,414 @@
+{% extends "ohi/layout.html" %}
+
+{% block title %}
+    Ocean Parameters
+{% endblock %}
+
+{% block content %}
+<style>
+    h2 {
+        margin-top: 10px;
+        margin-bottom: 20px;
+    }
+    .list-group {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .list-group-item {
+        transition: background-color 0.3s ease;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 60%;
+    }
+
+    .list-group-item:hover {
+        background-color: #f0f0f0; /* Light grey background on hover */
+    }
+
+    .icon-button {
+        background: none;
+        border: none;
+        cursor: pointer;
+        margin-left: 5px;
+        padding: 5px;
+    }
+
+    .icon-button i {
+        color: #007bff; /* Icon color */
+    }
+
+    .button-container {
+        display: flex;
+    }
+
+</style>
+
+<div class="container">
+    <h1>Ocean Parameters Visualization</h1>
+    <p>
+        After downloading the parameters, you can visualize them here. You can also delete any parameter you no longer need.
+    </p>
+</div>
+
+<div class="container">
+    <h2 style="padding-left: 150px;">Ocean Parameters</h2>
+    <ul class="list-group" id="list_param">
+        {% for record in records %}
+        <li class="list-group-item" data-record-id="{{ record.id }}">
+            Order No. {{ record.id }}
+            <div class="buttons-container">
+                <button class="icon-button" onclick="confirmVisualization(this, '{{ record.id }}')"><i class="fas fa-eye"></i></button>
+                <button class="icon-button" onclick="showRecordInfo(this)" variable="Variable: {{ record.variable }}" time_range="From: {{ record.start_date }} to {{ record.end_date }}" create_time="Created at: {{record.requested_time}}"><i class="fas fa-info-circle"></i></button>
+                <button class="icon-button" onclick="deleteRecord(this, '{{ record.id }}')"><i class="fas fa-trash-alt"></i></button>
+            </div>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+<div class="container">
+    <h2 style="padding-left: 15  0px;">Ocean Health</h2>
+    <ul class="list-group" id="list_param">
+        {% for record in health_records %}
+        <li class="list-group-item" data-record-id="{{ record.id }}">
+            Order No. {{ record.id }}
+            <div class="buttons-container">
+                <button class="icon-button" onclick="confirmHealthVisualization(this, '{{ record.id }}')"><i class="fas fa-eye"></i></button>
+                <button class="icon-button" onclick="showHealthRecordInfo(this)" coord="At {{record.lat}} N, {{record.lon}} E, with a radius of {{record.radius}} km" time_range="From: {{ record.start_date }} to {{ record.end_date }}" create_time="Created at: {{record.requested_time}}"><i class="fas fa-info-circle"></i></button>
+                <button class="icon-button" onclick="deleteHealthRecord(this, '{{ record.id }}')"><i class="fas fa-trash-alt"></i></button>
+            </div>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+<div class="modal fade" id="infoModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h1 class="modal-title fs-5" id="exampleModalLabel">Order Information</h1>
+        <button type="button" id="closeInfoModalButton" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+        <p id="modalText">Some text in the Modal..</p>
+        </div>
+      </div> 
+    </div>
+</div>
+<div class="modal fade" id="visualModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h1 class="modal-title fs-5" id="visualModalLabel">Confirm parameter visualization</h1>
+          <button type="button" ID="closeVisualModalButton" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          Do you want to visualize the parameter of this order?
+        </div>
+        <div class="modal-footer">
+          <button type="button" id="closeVisualModalButton" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <!-- Inside your modal --> 
+        <button type="button" class="btn btn-primary" id="confirmVisualizationBtn">Confirm</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="modal fade" id="visualHealthModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h1 class="modal-title fs-5" id="visualModalLabel">Confirm Ocean Health visualization</h1>
+          <button type="button" ID="closeVisualModalButton" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          Do you want to visualize the Ocean Health of Score this order?
+        </div>
+        <div class="modal-footer">
+          <button type="button" id="closeVisualModalButton" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <!-- Inside your modal --> 
+        <button type="button" class="btn btn-primary" id="confirmHealthVisualizationBtn">Confirm</button>
+        </div>
+      </div>
+    </div>
+  </div>
+<div id="deleteConfirmationModal" class="modal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirm Deletion</h5>
+                <button type="button" id="closeDeleteModalButton" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete this record?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" id="confirmDelete">Yes, Delete</button>
+                <button type="button" id="cancelDeleteModalButton" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div id="deleteHealthConfirmationModal" class="modal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirm Deletion</h5>
+                <button type="button" id="closeHealthDeleteModalButton" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete this Ocean Health record?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" id="confirmHealthDelete">Yes, Delete</button>
+                <button type="button" id="cancelHealthDeleteModalButton" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal" id="successDeleteModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Success</h5>
+                <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p id="successDeleteMessage"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+function getCSRFToken() {
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    if (!csrfToken) {
+        alert('CSRF token not found.');
+    }
+    return csrfToken;
+}
+function showHealthRecordInfo(button){
+    const timeRange= button.getAttribute('time_range');
+    const create_time = button.getAttribute('create_time');
+    const coord = button.getAttribute('coord');
+    document.getElementById('modalText').innerHTML = `<h5>Ocean Health</h5>${coord}<br>${timeRange}<br>${create_time}`;
+        // Use Bootstrap 5's method to show the modal
+    var modalElement = document.getElementById('infoModal');
+    var modalInstance = new bootstrap.Modal(modalElement);
+    modalInstance.show();
+
+    // Assuming you have an element with an ID 'closeModalButton' to close the modal
+    document.getElementById('closeInfoModalButton').onclick = function() {
+        modalInstance.hide();
+    };
+}
+function showRecordInfo(button) {
+    const variable = button.getAttribute('variable');
+    const timeRange = button.getAttribute('time_range');
+    const create_time = button.getAttribute('create_time');
+    // Set the text for the modal
+    document.getElementById('modalText').innerText = `${variable}\n${timeRange}\n${create_time}`;
+    
+    // Use Bootstrap 5's method to show the modal
+    var modalElement = document.getElementById('infoModal');
+    var modalInstance = new bootstrap.Modal(modalElement);
+    modalInstance.show();
+
+    // Assuming you have an element with an ID 'closeModalButton' to close the modal
+    document.getElementById('closeInfoModalButton').onclick = function() {
+        modalInstance.hide();
+    };
+}
+
+function deleteRecord(button, recordId) {
+    const modalElement = document.getElementById('deleteConfirmationModal');
+    modalElement.setAttribute('data-record-id', recordId);
+
+    // Bootstrap 5: Create a new Modal instance and show it
+    var modalInstance = new bootstrap.Modal(modalElement);
+    modalInstance.show();
+
+    // Correctly handle the close button click for Bootstrap 5
+    document.getElementById('closeDeleteModalButton').onclick = function() {
+        modalInstance.hide();
+    };
+    document.getElementById('cancelDeleteModalButton').onclick = function() {
+        var modalInstance = bootstrap.Modal.getInstance(document.getElementById('deleteConfirmationModal'));
+        modalInstance.hide();
+    };
+}
+function deleteHealthRecord(button, recordId) {
+    const modalElement = document.getElementById('deleteHealthConfirmationModal');
+    modalElement.setAttribute('data-record-id', recordId);
+
+    // Bootstrap 5: Create a new Modal instance and show it
+    var modalInstance = new bootstrap.Modal(modalElement);
+    modalInstance.show();
+
+    // Correctly handle the close button click for Bootstrap 5
+    document.getElementById('closeHealthDeleteModalButton').onclick = function() {
+        modalInstance.hide();
+    };
+    document.getElementById('cancelHealthDeleteModalButton').onclick = function() {
+        var modalInstance = bootstrap.Modal.getInstance(document.getElementById('deleteHealthConfirmationModal'));
+        modalInstance.hide();
+    };
+}
+document.getElementById('confirmDelete').addEventListener('click', function() {
+    const modalElement = document.getElementById('deleteConfirmationModal');
+    const recordId = modalElement.getAttribute('data-record-id');
+
+    // Assuming getCSRFToken() and other context-specific functions are defined elsewhere
+    const csrfToken = getCSRFToken();
+    const formData = new FormData();
+    formData.append('id', recordId);
+    formData.append('csrfmiddlewaretoken', csrfToken);
+
+    fetch('{% url "ohi:delete_record" %}', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Use the recordId to find the corresponding list item and remove it
+            document.querySelector(`[data-record-id="${recordId}"]`).remove();
+            document.getElementById('successDeleteMessage').textContent = 'Record deleted successfully.';
+            var successModal = new bootstrap.Modal(document.getElementById('successDeleteModal'));
+            successModal.show(); // Show the success modal
+        } else {
+            alert('Failed to delete record.');
+        }
+        // Close the modal after action
+        var modalInstance = bootstrap.Modal.getInstance(modalElement);
+        modalInstance.hide();
+    });
+});
+document.getElementById('confirmHealthDelete').addEventListener('click', function() {
+    const modalElement = document.getElementById('deleteHealthConfirmationModal');
+    const recordId = modalElement.getAttribute('data-record-id');
+
+    // Assuming getCSRFToken() and other context-specific functions are defined elsewhere
+    const csrfToken = getCSRFToken();
+    const formData = new FormData();
+    formData.append('id', recordId);
+    formData.append('csrfmiddlewaretoken', csrfToken);
+
+    fetch('{% url "ohi:delete_health_record" %}', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Use the recordId to find the corresponding list item and remove it
+            document.querySelector(`[data-record-id="${recordId}"]`).remove();
+            document.getElementById('successDeleteMessage').textContent = 'Record deleted successfully.';
+            var successModal = new bootstrap.Modal(document.getElementById('successDeleteModal'));
+            successModal.show(); // Show the success modal
+        } else {
+            alert('Failed to delete record.');
+        }
+        // Close the modal after action
+        var modalInstance = bootstrap.Modal.getInstance(modalElement);
+        modalInstance.hide();
+    });
+});
+
+
+function confirmVisualization(button, recordId) {
+    // Set the record ID on the modal
+    var visualModalElement = document.getElementById('visualModal');
+    visualModalElement.setAttribute('data-record-id', recordId); // Set the record ID here
+
+    // Use Bootstrap 5's method to show the modal
+    var visualModalInstance = new bootstrap.Modal(visualModalElement);
+    visualModalInstance.show();
+}
+function confirmHealthVisualization(button, recordId) {
+    // Set the record ID on the modal
+    var visualModalElement = document.getElementById('visualHealthModal');
+    visualModalElement.setAttribute('data-record-id', recordId); // Set the record ID here
+
+    // Use Bootstrap 5's method to show the modal
+    var visualModalInstance = new bootstrap.Modal(visualModalElement);
+    visualModalInstance.show();
+}
+document.getElementById('confirmHealthVisualizationBtn').addEventListener('click', function() {
+    const modalElement = document.getElementById('visualHealthModal');
+    const recordId = modalElement.getAttribute('data-record-id');
+
+    const csrfToken = getCSRFToken();
+    const formData = new FormData();
+    formData.append('id', recordId);
+
+    fetch('{% url "ohi:health_visual" %}', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': csrfToken // Include the CSRF token in the request headers
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.location.href = data.redirect_url;
+        } else {
+            alert('Failed to confirm visualization: ' + (data.message || 'Unknown error'));
+        }
+        var modalInstance = bootstrap.Modal.getInstance(modalElement);
+        modalInstance.hide();
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred. Please try again.');
+        var modalInstance = bootstrap.Modal.getInstance(modalElement);
+        modalInstance.hide();
+    });
+});
+
+document.getElementById('confirmVisualizationBtn').addEventListener('click', function() {
+    const modalElement = document.getElementById('visualModal');
+    const recordId = modalElement.getAttribute('data-record-id');
+
+    const csrfToken = getCSRFToken();
+    const formData = new FormData();
+    formData.append('id', recordId);
+
+    fetch('{% url "ohi:param_visual" %}', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': csrfToken // Include the CSRF token in the request headers
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.location.href = data.redirect_url;
+        } else {
+            alert('Failed to confirm visualization: ' + (data.message || 'Unknown error'));
+        }
+        var modalInstance = bootstrap.Modal.getInstance(modalElement);
+        modalInstance.hide();
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred. Please try again.');
+        var modalInstance = bootstrap.Modal.getInstance(modalElement);
+        modalInstance.hide();
+    });
+});
+
+</script>
+{% endblock %}

@@ -1,0 +1,278 @@
+{% extends "ohi/layout.html" %}
+
+{% block title %}
+    Ocean Health
+{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+    }
+    .flex-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        flex-wrap: wrap;
+    }
+    form {
+        background-color: #f8f9fa;
+        padding: 20px;
+        border-radius: 5px;
+        max-width: 750px;
+        min-width: 300px;
+        flex: 1;
+        margin: 20px;
+    }
+    h2 {
+        color: #6c757d;
+    }
+    h1 {
+        padding-top: 20px;
+    }
+    input[type="submit"] {
+        background-color: #007bff;
+        color: white;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+    input[type="submit"]:hover {
+        background-color: #0056b3;
+    }
+    .location-row, .timespan-row, .parameters-row {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+    .form-select, .form-control {
+        width: 20%;
+        min-width: 150px;
+    }
+    .map-container {
+        margin: 50px;
+        height: 400px;
+        flex: 1;
+        min-width: 300px;
+    }
+</style>
+
+{% if message %}
+    <div class="alert alert-success" role="alert">
+        {{ message }}
+    </div>
+{% endif %}
+
+<div class="container">
+    <h1>Ocean Health Score</h1>
+    <p>Please select the parameters you would like to view. These parameters are critical for understanding various aspects of oceanography, including water quality, marine life health, and ocean currents.</p>
+</div>
+<div class="container flex-container">
+    <form id="health-form" action="{% url 'ohi:health' %}" method="post">
+        {% csrf_token %}
+        <h2>Select location</h2>
+        <div class="location-row">
+            <input class="form-control input-width" id="lat" name="lat" type="number" step="any" placeholder="Latitude">
+            <input class="form-control input-width" id="lon" name="lon" type="number" step="any" placeholder="Longitude">
+            <select class="form-select" id="radius" name="radius">
+                <option selected>Select radius</option>
+                <option value="50">50km</option>
+                <option value="100">100km</option>
+            </select>
+        </div>
+        <h2>Select timespan</h2>
+        <div class="timespan-row">
+            <input class="form-control input-width" id="start_date" name="start_date" type="date" placeholder="Start Date">
+            <input class="form-control input-width" id="end_date" name="end_date" type="date" placeholder="End Date">
+        </div>
+
+        <h2>Submit</h2>
+        <!-- Trigger/Open The Modal -->
+        <button type="button" id="openModal" class="btn btn-primary">Submit</button>
+    </form>
+
+    <div id="map" class="map-container"></div>
+    <div class="modal fade" id="exampleModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h1 class="modal-title fs-5" id="exampleModalLabel">Confirm your order information</h1>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          ...
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <!-- Inside your modal -->
+        <button type="button" class="btn btn-primary" id="confirmSubmit">Confirm</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="modal fade" id="exampleModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h1 class="modal-title fs-5" id="exampleModalLabel">Confirm your order information</h1>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          ...
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <!-- Inside your modal -->
+        <button type="button" class="btn btn-primary" id="confirmSubmit">Confirm</button>
+        </div>
+      </div>
+    </div>
+  </div>
+<div class="modal" id="progressBarModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Processing...</h5>
+            </div>
+            <div class="modal-body">
+                <div class="progress">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal" id="successModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Success</h5>
+                <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p id="successMessage"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    var map = L.map('map').setView([48.1491, 11.567], 17); // Set initial view to a neutral location
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 18,
+    }).addTo(map);
+
+    // Event listener for latitude and longitude inputs
+    document.getElementById('lat').addEventListener('input', updateMap);
+    document.getElementById('lon').addEventListener('input', updateMap);
+    document.getElementById('radius').addEventListener('change', updateMap);
+
+    var marker;
+    var circle;
+
+    function updateMap() {
+        var lat = parseFloat(document.getElementById('lat').value);
+        var lon = parseFloat(document.getElementById('lon').value);
+        var radius = parseFloat(document.getElementById('radius').value) * 1000; // Convert km to meters
+
+        if (!isNaN(lat) && !isNaN(lon)) {
+            if (marker) {
+                marker.setLatLng([lat, lon]);
+            } else {
+                marker = L.marker([lat, lon]).addTo(map);
+            }
+            map.setView([lat, lon], 8); // Zoom level can be adjusted as needed
+            if (circle) {
+                circle.setLatLng([lat, lon]);
+                circle.setRadius(radius);
+            } else {
+                circle = L.circle([lat, lon], {
+                    color: 'blue',
+                    fillColor: '#f03',
+                    fillOpacity: 0.2,
+                    radius: radius
+                }).addTo(map);
+            }
+        }
+    }
+});
+document.querySelector('#openModal').addEventListener('click', function(event) {
+    event.preventDefault(); // Prevent form submission
+
+    // Capture form data
+    var lat = document.getElementById('lat').value;
+    var lon = document.getElementById('lon').value;
+    var radius = document.getElementById('radius').value;
+    var startDate = document.getElementById('start_date').value;
+    var endDate = document.getElementById('end_date').value;
+
+    // Insert data into modal
+    var modalBodyContent = `
+        <p><strong>Latitude:</strong> ${lat}</p>
+        <p><strong>Longitude:</strong> ${lon}</p>
+        <p><strong>Radius:</strong> ${radius} km</p>
+        <p><strong>Start Date:</strong> ${startDate}</p>
+        <p><strong>End Date:</strong> ${endDate}</p>
+    `;
+    document.querySelector('.modal-body').innerHTML = modalBodyContent;
+
+    // Show the modal
+    var myModal = new bootstrap.Modal(document.getElementById('exampleModal'), {
+        keyboard: false
+    });
+    myModal.show();
+});
+document.querySelector('#confirmSubmit').addEventListener('click', function(event) {
+    event.preventDefault(); // Prevent the default form submission
+
+    // Show the progress bar modal
+    var progressBarModal = new bootstrap.Modal(document.getElementById('progressBarModal'), {
+        keyboard: false,
+        backdrop: 'static'
+    });
+    progressBarModal.show();
+
+    // Collect form data
+    const formData = new FormData(document.querySelector('#health-form'));
+
+    // Submit form data using AJAX
+    fetch(document.querySelector('#health-form').action, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+        },
+    }).then(response => {
+        if (!response.ok) {
+            throw new Error(`Network response was not ok: ${response.statusText}`);
+        }
+        return response.json();
+    }).then(data => {
+        document.getElementById('successMessage').textContent = data.message; // Update the modal's message
+
+        var successModal = new bootstrap.Modal(document.getElementById('successModal'));
+        successModal.show(); // Show the success modal
+    }).catch(error => {
+        console.error('There was a problem with the fetch operation:', error);
+    }).finally(() => {
+        // Hide the progress bar modal
+        progressBarModal.hide();
+
+    });
+
+    // Optionally, close the main modal if needed
+    var myModal = bootstrap.Modal.getInstance(document.getElementById('exampleModal'));
+    myModal.hide();
+});
+</script>
+{% endblock %}

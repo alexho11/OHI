@@ -1,0 +1,57 @@
+{% extends "ohi/layout.html" %}
+{% block content %}
+<style>
+    .container {
+        font-family: 'Arial', sans-serif;
+        max-width: 800px;
+        margin: auto;
+        background-color: #fff;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .container h1, .container h2 {
+        color: #333;
+    }
+    .container h1 {
+        margin-bottom: 20px;
+    }
+    .container h2 {
+        margin-top: 40px;
+        margin-bottom: 10px;
+    }
+    .container ul {
+        list-style-type: none;
+        padding: 0;
+    }
+    .container li {
+        margin-bottom: 10px;
+    }
+</style>
+<body>    
+    <div class="container">
+        <h1>Welcome, {{request.user.first_name}}</h1>
+        <table class="table table-bordered no-footer">
+            <tr>
+                <th colspan="2" class="table-header">User information</th>
+            </tr>
+            <tr>
+                <td class="table-info col-md-4">Name</td>
+                <td>{{request.user.first_name}} {{request.user.last_name}}</td>
+            </tr>
+            <tr>
+                <td class="table-info">Company</td>
+                <td>Technical University of Munich</td>
+            </tr>
+            <tr>
+                <td class="table-info">Email</td>
+                <td>{{request.user.email}}</td>
+            </tr>
+        </table>
+        <!-- <ul>
+            <li>Username: {{request.user.username}}</li>
+            <li>Email: {{request.user.email}}</li>
+        </ul> -->
+    </div>
+</body>
+{% endblock %}

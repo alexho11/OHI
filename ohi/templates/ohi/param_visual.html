@@ -1,0 +1,302 @@
+{% extends "ohi/layout.html" %}
+{% load static %}
+{% block title %}
+    Parameter Visualization
+{% endblock %}
+
+{% block content %}
+<head>
+    <title>time_slider</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/geotiff"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<style>
+    .slidecontainer {
+        width: 100px;
+    }
+    .container {
+        font-family: 'Arial', sans-serif;
+        max-width: 800px;
+        margin: auto;
+        background-color: #fff;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .layout-container {
+    display: grid;
+    grid-template-columns: 2fr 1.5fr; /* Adjust the ratio according to your needs */
+    grid-template-rows: auto auto; /* Adjust based on content */
+    gap: 20px; /* Space between grid items */
+    }
+
+    .slider-chart-container {
+        display: flex;
+        flex-direction: column;
+        padding: 20px;
+    }
+    .controls-info {
+    display: flex;
+    flex-wrap: wrap; /* Allows items to wrap to the next line if the container is too narrow */
+    align-items: center; /* Vertically centers the items in the container */
+    gap: 20px; /* Adds space between items */
+    justify-content: space-around; /* Distributes items evenly with space around them */
+    margin-top: 80px;
+    background-color: #f8f9fa;
+    padding: 20px;
+    border-radius: 15px;
+    flex: 1;
+    }
+
+    .controls-info > * {
+        flex: 1 1 auto; /* Allows items to grow and shrink as needed, but not to be smaller than their content */
+        min-width: 120px; /* Sets a minimum width for items to prevent them from becoming too narrow */
+
+    }
+    .info.legend, #play, #stop {
+    order: 1; /* Ensures these elements come first */
+}
+
+#valueDisplay {
+    order: 2; /* This will move the valueDisplay to the second row */
+    width: 100%; /* Ensures it spans the full width of the container */
+}
+</style>
+<body data-media-url="{% get_media_prefix %}">
+    <div style="margin: 20px;">
+        <h1>{{variable|upper}}</h1>
+        <p>
+            The {{variable}} value from {{timestamps.0}} to {{timestamps|last}} is shown below. 
+        </p>
+    </div>
+    <!-- Wrap your elements in a layout container -->
+    <div class="layout-container">
+        <div id="map" style="width: 100%; height: 600px;"></div>
+        <div class="slider-chart-container">
+            <canvas class="my-4 w-100" id="myChart" width="900" height="380"></canvas>
+        <!-- </div> -->
+        <!-- <div class="slidecontainer"> -->
+            <div class="controls-info" >
+                <div class="input-label-container">
+                    <input type="range" min="1" max="100" value="1" class="form-range" id="slider">
+                    <label for="slider" id="sliderLabel" class="form-label"></label>
+                </div>
+                <div class="info legend" id="legend"></div>
+                <button id="play" class="btn btn-primary">Play</button>
+                <button id="stop" class="btn btn-primary">Stop</button>
+                <div id="valueDisplay"><h5><b>{{variable|upper}} Value:</b> <span id="parameterValue">N/A {{unit}}</h5></span></div>
+            </div>
+    </div>
+</div>
+
+</body>
+<script>
+var map = L.map('map').setView([22, 78.5], 5, {
+    crs: L.CRS.EPSG4326
+});
+
+var basemaps = {
+    'Topo Map': L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+        crs: L.CRS.EPSG4326
+    }),
+    'Geo World Map': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/NatGeo_World_Map/MapServer/tile/{z}/{y}/{x}', {
+        crs: L.CRS.EPSG4326
+    })
+};
+
+L.control.layers(basemaps).addTo(map);
+basemaps["Geo World Map"].addTo(map);
+
+const recordId = "{{ record_id }}";
+const timestamps = {{ timestamps|safe }};
+const pngFiles = {{ png_files|safe }};
+const bound_const = {{ bounds|safe }};
+const tiffFiles = {{ tiff_files|safe }};
+const mean = {{ mean_value|safe }};
+const unit = "{{ unit}}";
+const variable = "{{ variable }}";
+
+
+console.log("Record ID:", recordId);
+console.log("Timestamps:", timestamps);
+console.log("PNG Files:", pngFiles);
+console.log("Tiff Files", tiffFiles);
+console.log("Bounds:", bound_const);
+console.log("Mean Values:", mean);
+console.log("Unit:", unit);
+console.log("Variable:", variable);
+
+
+// Access the <body> element
+const bodyElement = document.body;
+
+// Retrieve the value of the data-media-url attribute
+const mediaUrl = bodyElement.getAttribute('data-media-url');
+console.log("Media URL:", mediaUrl);
+
+var bound = new L.LatLngBounds(
+    new L.LatLng(bound_const[0].north, bound_const[0].west),
+    new L.LatLng(bound_const[0].south, bound_const[0].east)
+);
+
+map.fitBounds(bound);
+
+// Use the mediaUrl value, for example, to create an image URL
+const urlPrefix = `${mediaUrl}${recordId}/`;
+var imageUrl = `${urlPrefix}${pngFiles[0]}`;
+var tiffUrl = `${urlPrefix}${tiffFiles[0]}`;
+
+console.log(imageUrl); // Just an example to show the constructed URL
+
+// Setting max value of the slider
+document.getElementById("slider").max = "" + timestamps.length + "";
+
+// Setting default label of the slider
+document.getElementById("sliderLabel").innerHTML = timestamps[0];
+
+// Change the prefix of the URL if your images are not in the same folder as your script
+var imageOverlay = new L.ImageOverlay(imageUrl, bound, {
+    opacity: 1,
+    interactive: false
+}).addTo(map);
+
+async function loadTiff(url) {
+    const response = await fetch(url);
+    const arrayBuffer = await response.arrayBuffer();
+    const tiff = await GeoTIFF.fromArrayBuffer(arrayBuffer);
+    const image = await tiff.getImage();
+    const raster = await image.readRasters();
+    return { image, raster };
+}
+
+async function initialize() {
+    currentTiff = await loadTiff(tiffUrl);
+}
+
+var currentTiff;
+initialize();
+
+document.getElementById("slider").oninput = async function() {
+    const index = this.value - 1;
+    document.getElementById("sliderLabel").innerHTML = timestamps[index];
+    imageOverlay.setUrl(urlPrefix + pngFiles[index]);
+    currentTiff = await loadTiff(urlPrefix + tiffFiles[index]);
+};
+let marker;
+map.on('click', function(e) {
+    if (!currentTiff) return;
+    const lat = e.latlng.lat;
+    const lng = e.latlng.lng;
+    const bbox = currentTiff.image.getBoundingBox();
+
+    // Check if the clicked coordinates are within the bbox
+    if (lng < bbox[0] || lng > bbox[2] || lat < bbox[1] || lat > bbox[3]) {
+        console.log("Clicked outside the bounding box.");
+        return; // Exit the function if outside bbox
+    }
+
+    const xSize = currentTiff.image.getWidth();
+    const ySize = currentTiff.image.getHeight();
+    const xRes = (bbox[2] - bbox[0]) / xSize;
+    const yRes = (bbox[3] - bbox[1]) / ySize;
+
+    const x = Math.floor((lng - bbox[0]) / xRes);
+    const y = Math.floor((lat - bbox[1]) / yRes);
+
+    const value = currentTiff.raster[0][y * xSize + x];
+    document.getElementById('parameterValue').innerText = value.toFixed(5)+" "+unit;
+
+    if (marker) {
+        map.removeLayer(marker);
+    }
+    marker = L.marker([lat, lng]).addTo(map);
+});
+
+var playTimeOut;
+
+async function play() {
+    playTimeOut = setTimeout(async function() {
+        var val = document.getElementById("slider").value;
+        if (val == document.getElementById("slider").max) {
+            clearTimeout(playTimeOut);
+            document.getElementById('stop').style.display = "none";
+            document.getElementById('play').style.display = "block";
+        } else {
+            document.getElementById("slider").value = Number(val) + 1;
+            imageOverlay.setUrl(urlPrefix + pngFiles[Number(val) - 1]);
+            currentTiff = await loadTiff(urlPrefix + tiffFiles[Number(val) - 1]);
+            play();
+        }
+        document.getElementById("sliderLabel").innerHTML = timestamps[Number(val) - 1];
+    }, 1000);
+}
+
+var legend = L.control({position: 'bottomright'});
+
+legend.onAdd = function(map) {
+    var div = L.DomUtil.get('legend');
+    div.innerHTML +=
+        '<i style="background: #440154; width: 18px; height: 18px; display: inline-block; margin-right: 4px;"></i> < 0.2<br>' +
+        '<i style="background: #3b528b; width: 18px; height: 18px; display: inline-block; margin-right: 4px;"></i> 0.2 - 0.4<br>' +
+        '<i style="background: #21918c; width: 18px; height: 18px; display: inline-block; margin-right: 4px;"></i> 0.4 - 0.6<br>' +
+        '<i style="background: #5ec962; width: 18px; height: 18px; display: inline-block; margin-right: 4px;"></i> 0.6 - 0.8<br>' +
+        '<i style="background: #fde725; width: 18px; height: 18px; display: inline-block; margin-right: 4px;"></i> > 0.8<br>';
+    return div;
+};
+
+legend.addTo(map);
+
+document.getElementById('play').onclick = function(e) {
+    play();
+    document.getElementById('stop').style.display = "block";
+    document.getElementById('play').style.display = "none";
+};
+
+document.getElementById('stop').onclick = function(e) {
+    clearTimeout(playTimeOut);
+    document.getElementById('stop').style.display = "none";
+    document.getElementById('play').style.display = "block";
+};
+
+document.getElementById('stop').style.display = "none";
+// Assuming meanValues = [/* array of mean values */] and timestamps = [/* array of timestamps */]
+
+var ctx = document.getElementById('myChart');
+var myChart = new Chart(ctx, {
+    type: 'line', // Type of chart: line chart
+    data: {
+        labels: timestamps, // X-axis labels (timestamps)
+        datasets: [{
+            label: 'Mean Value', // Label for the dataset
+            data: mean[0], // Data points for the dataset
+            backgroundColor: 'rgba(255, 99, 132, 0.2)', // Background color of the points
+            borderColor: 'rgba(255, 99, 132, 1)', // Border color of the points
+            borderWidth: 1 // Border width of the points
+        }]
+    },
+    options: {
+        scales: {
+            y: {
+                beginAtZero: true, // Start the y-axis at 0
+                title: {
+                    display: true,
+                    text: 'Mean Value' // Y-axis label
+                }
+            },
+            x: {
+                title: {
+                    display: true,
+                    text: 'Timestamp' // X-axis label
+                }
+            }
+        }
+    }
+});
+</script>
+
+{% endblock %}
