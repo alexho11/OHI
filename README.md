@@ -6,6 +6,8 @@
 
 This web application is developed using Python and **Django** for the web framework and **Leaflet** for geospatial visualization. 
 
+**Video demonstration**: https://youtu.be/V_35sJFYWBU
+
 ### Ocean Parameter Selection
 In this site you can select the location you are interested in and download relevant ocean parameter from the **Coperinicus marine services** within your defined timespan and range. 
 
